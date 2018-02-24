@@ -1,0 +1,109 @@
+"select\n" +
+                "  product.id product_id/*商品编号*/,\n" +
+                "  product.product_category category_id,/*商品分类编号*/\n" +
+                "  ifnull(product.type, 0) product_type,/*商品类型*/\n" +
+                "  goods.id goods_id/*SPU编号*/,\n" +
+                "  brand.id brand_id/*品牌编号*/,\n" +
+                "  brand.name brand_name/*品牌名称*/,\n" +
+                "  product.sn product_sn/*商品sn集合*/,\n" +
+                "  product.full_name product_full_name/*商品名称*/,\n" +
+                "  product.image product_image/*商品图片*/,\n" +
+                "  supplier.id supplier_id/*供应商编号*/,\n" +
+                "  supplier.name supplier_name/*供应商名称*/,\n" +
+                "  ifnull(area_template.template_ids, 'all') supplier_area_list/*供应商配送模版*/,\n" +
+                "  UNIX_TIMESTAMP(product.create_date) create_date/*商品创建时间 */,\n" +
+                "  product.price price/*价格*/,\n" +
+                "  product.market_price market_price/*建议售价*/,\n" +
+                "  ifnull(is_overseas, false) is_overseas/*是否海淘*/,\n" +
+                "  ifnull(storage.stock, 0) stock/*库存数量*/,\n" +
+                "  ifnull(sales.sales, 0) sales/*销量数量*/,\n" +
+                "  spec.spec_id_list/*商品规格编号*/,\n" +
+                "  spec.spec_name_list/*商品规格名称*/,\n" +
+                "  category.category_one_code_list/*商品一级分类*/,\n" +
+                "  category.category_two_code_list/*商品二级分类*/,\n" +
+                "  category.category_three_code_list/*商品三级分类*/,\n" +
+                "  category.category_code_list/*商品分类编号*/,\n" +
+                "  category.category_name_list/*商品分类名称*/,\n" +
+                "  saas_category.category_one_code_list saas_category_one_code_list/*Saas商品一级分类*/,\n" +
+                "  saas_category.category_two_code_list saas_category_two_code_list/*Saas商品二级分类*/,\n" +
+                "  saas_category.category_three_code_list saas_category_three_code_list/*Saas商品三级分类*/,\n" +
+                "  saas_category.category_code_list saas_category_code_list/*Saas商品分类编号*/,\n" +
+                "  saas_category.category_name_list saas_category_name_list/*Saas商品分类名称*/,\n" +
+                "  ifnull(staging.max_staging, 0) max_staging/*商品支持的最大分期*/,\n" +
+                "  saleplat.platforms/*商品销售渠道*/\n" +
+                "from xx_product product/*商品信息*/\n" +
+                "inner join xx_goods goods/*商品SPU*/ on product.goods = goods.id and goods.islist=1\n" +
+                "inner join xx_supplier supplier/*供应商信息*/ on supplier.id=product.supplier_id\n" +
+                "inner join (\n" +
+                "  select supplier_id, group_concat(saleplat_id separator ',,') platforms\n" +
+                "  from msds_supplier_saleplat\n" +
+                "  where is_enable=true\n" +
+                "  group by supplier_id\n" +
+                ") saleplat/*平台供应商*/ on saleplat.supplier_id=supplier.id\n" +
+                "left join (\n" +
+                "  select supplier.id, group_concat(template.id separator ',,') template_ids\n" +
+                "  from xx_supplier supplier\n" +
+                "  inner join msds_area_template template on supplier.id=template.supplier_id\n" +
+                "  group by supplier.id\n" +
+                ") area_template/*供应商配送模版*/ on area_template.id=product.supplier_id\n" +
+                "left join xx_brand brand/*商品品牌*/ on product.brand = brand.id\n" +
+                "left join (\n" +
+                "  # 商品库存\n" +
+                "  select product_id, sum(for_order) stock\n" +
+                "  from xx_storage/*商品库存表*/\n" +
+                "  group by product_id\n" +
+                ") storage/*商品库存*/ on storage.product_id=product.id\n" +
+                "left join (\n" +
+                "  # 商品销量\n" +
+                "  select item.product, sum(item.quantity) sales\n" +
+                "  from xx_order_item item/*订单商品*/\n" +
+                "  inner join xx_order `order`/*订单*/ on item.orders = `order`.id\n" +
+                "  where `order`.order_status not in (3, 6)\n" +
+                "  group by item.product\n" +
+                ") sales/*商品销量*/ on sales.product=product.id\n" +
+                "left join (\n" +
+                "  # 商品规格合并\n" +
+                "  select product_id,\n" +
+                "    upper(group_concat(concat(spec.id, '_', spec_value.id) separator ',,')) spec_id_list,\n" +
+                "    group_concat(concat(spec.name, '_', spec_value.name) separator ',,') spec_name_list\n" +
+                "  from msds_goods_specvalue_relations spec_relations/*商品规格关系*/\n" +
+                "  left join xx_specification spec/*规格名称*/ on spec_relations.spec_id=spec.id\n" +
+                "  left join xx_specification_value spec_value/*规格值*/ on spec_relations.spec_value_id=spec_value.id\n" +
+                "  group by product_id\n" +
+                ") spec/*商品规格*/ on spec.product_id=product.id\n" +
+                "left join (\n" +
+                "  select product.id,\n" +
+                "    upper(group_concat(category_one.only_code separator ',,')) category_one_code_list,\n" +
+                "    upper(group_concat(category_two.only_code separator ',,')) category_two_code_list,\n" +
+                "    upper(group_concat(category_three.only_code separator ',,')) category_three_code_list,\n" +
+                "    upper(group_concat(concat(category_one.only_code, '_', category_two.only_code, '_', category_three.only_code) separator ',,')) category_code_list,\n" +
+                "    group_concat(concat(category_one.display_name, '_', category_two.display_name, '_', category_three.display_name) separator ',,') category_name_list\n" +
+                "  from xx_product product/*商品信息*/\n" +
+                "  inner join msds_product_display_category_relations category_relations/*商品分类到显示分类关系表*/ on category_relations.product_category_id=product.product_category\n" +
+                "  inner join msds_display_category category_three/*三级分类*/ on category_three.id=category_relations.display_category_id\n" +
+                "  inner join msds_display_category category_two/*二级分类*/ on category_three.parent_cid=category_two.id\n" +
+                "  inner join msds_display_category category_one/*一级分类*/ on category_two.parent_cid=category_one.id\n" +
+                "  where product.is_marketable=true\n" +
+                "  group by product.id\n" +
+                ") category/*商品分类*/ on category.id=product.id\n" +
+                "left join (\n" +
+                "  select product.id,\n" +
+                "    upper(group_concat(category_one.only_code separator ',,')) category_one_code_list,\n" +
+                "    upper(group_concat(category_two.only_code separator ',,')) category_two_code_list,\n" +
+                "    upper(group_concat(category_three.only_code separator ',,')) category_three_code_list,\n" +
+                "    upper(group_concat(concat(category_one.only_code, '_', category_two.only_code, '_', category_three.only_code) separator ',,')) category_code_list,\n" +
+                "    group_concat(concat(category_one.display_name, '_', category_two.display_name, '_', category_three.display_name) separator ',,') category_name_list\n" +
+                "  from xx_product product/*商品信息*/\n" +
+                "  inner join saas_product_display_category_relations category_relations/*商品分类到显示分类关系表*/ on category_relations.product_category_id=product.product_category\n" +
+                "  inner join saas_display_category category_three/*三级分类*/ on category_three.id=category_relations.display_category_id\n" +
+                "  inner join saas_display_category category_two/*二级分类*/ on category_three.parent_cid=category_two.id\n" +
+                "  inner join saas_display_category category_one/*一级分类*/ on category_two.parent_cid=category_one.id\n" +
+                "  where product.is_marketable=true\n" +
+                "  group by product.id\n" +
+                ") saas_category/*Saas商品分类*/ on category.id=product.id\n" +
+                "left join (\n" +
+                "  select CONVERT(sn USING utf8) COLLATE utf8_unicode_ci sn, max(staging_id) max_staging\n" +
+                "  from msds_product_staging/*分期*/\n" +
+                "  group by sn\n" +
+                ") staging/*分期*/ on product.sn=staging.sn\n" +
+                "where product.is_marketable=true;"

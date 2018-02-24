@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding= "UTF-8" ?>
+<configuration>
+    <Console  name="ConsoleAppender" target="system_out">
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d{yyyy/MM/dd-HH:mm:ss} >> %5p >> %t >> %l >> %m%n"/>
+        </layout>
+    </Console>
+
+    <sockethub name="sockethubAppender">
+        <param name="port" value="5600"/>
+        <param name="remoteHost" value="localhost"/>　　　　　　
+        <param name="Threshold" value="debug"/>
+        <param name="LocationInfo" value="true"/>
+    </sockethub>
+
+    <root>
+        <!--<priority value="info"/>-->
+        <appender-ref ref="ConsoleAppender"/>
+        　　　　　　
+        <!--<appender-ref ref="sockethubAppender"/>-->
+    </root>
+</configuration>
